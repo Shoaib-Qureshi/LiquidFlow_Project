@@ -1,0 +1,221 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base styles */
+@layer base {
+    html {
+        scroll-behavior: smooth;
+    }
+    
+    body {
+        font-feature-settings: 'rlig' 1, 'calt' 1;
+    }
+}
+
+/* Component styles */
+@layer components {
+    .text-gray-100{
+        color: #212020 !important;
+    }
+
+    /* Modern gradient background */
+    .app-gradient {
+        background: linear-gradient(180deg, #f8fafc 0%, #ffffff 40%, #f1f5f9 100%);
+        min-height: 100vh;
+    }
+
+    /* Enhanced card styling */
+    .card-soft {
+        background: white;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+        border-radius: 0.75rem;
+        border: 1px solid rgba(229, 231, 235, 0.8);
+        transition: all 0.2s ease-in-out;
+    }
+
+    .card-soft:hover {
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        transform: translateY(-1px);
+    }
+
+    /* Brand badge with modern gradient */
+    .brand-badge {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        font-weight: 600;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Button enhancements */
+    .btn-primary {
+        @apply inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 active:bg-blue-900 focus:outline-none focus:border-blue-900 focus:ring ring-blue-300 disabled:opacity-25 transition ease-in-out duration-150;
+    }
+
+    .btn-secondary {
+        @apply inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest shadow-sm hover:text-gray-500 focus:outline-none focus:border-blue-300 focus:ring ring-blue-200 active:text-gray-800 active:bg-gray-50 disabled:opacity-25 transition ease-in-out duration-150;
+    }
+
+    /* Form enhancements */
+    .form-input {
+        @apply block w-full border-gray-300 focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 rounded-md shadow-sm;
+    }
+
+    .form-select {
+        @apply block w-full border-gray-300 focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 rounded-md shadow-sm;
+    }
+
+    /* Table enhancements */
+    .table-responsive {
+        @apply min-w-full divide-y divide-gray-200 overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg;
+    }
+
+    .table-header {
+        @apply px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50;
+    }
+
+    .table-cell {
+        @apply px-6 py-4 whitespace-nowrap text-sm text-gray-900;
+    }
+
+    /* Status badges */
+    .status-active {
+        @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800;
+    }
+
+    .status-inactive {
+        @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800;
+    }
+
+    .status-pending {
+        @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800;
+    }
+
+    .status-completed {
+        @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800;
+    }
+}
+
+/* Utility styles */
+@layer utilities {
+    /* Animation utilities */
+    .animate-fade-in {
+        animation: fadeIn 0.5s ease-in-out;
+    }
+
+    .animate-slide-up {
+        animation: slideUp 0.3s ease-out;
+    }
+
+    .animate-slide-down {
+        animation: slideDown 0.3s ease-out;
+    }
+
+    /* Responsive text utilities */
+    .text-responsive {
+        @apply text-sm sm:text-base lg:text-lg;
+    }
+
+    .text-responsive-sm {
+        @apply text-xs sm:text-sm lg:text-base;
+    }
+
+    /* Spacing utilities */
+    .space-responsive {
+        @apply space-y-4 sm:space-y-6 lg:space-y-8;
+    }
+
+    /* Grid responsive utilities */
+    .grid-responsive {
+        @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6;
+    }
+
+    .grid-responsive-2 {
+        @apply grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6;
+    }
+
+    /* Focus utilities */
+    .focus-ring {
+        @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
+    }
+
+    /* Backdrop blur for modals */
+    .backdrop-blur-modal {
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+    }
+}
+
+/* Keyframe animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Mobile-first responsive design improvements */
+@media (max-width: 640px) {
+    .mobile-padding {
+        @apply px-4 py-3;
+    }
+    
+    .mobile-text {
+        @apply text-sm;
+    }
+    
+    .mobile-grid {
+        @apply grid-cols-1 gap-3;
+    }
+}
+
+/* Tablet improvements */
+@media (min-width: 641px) and (max-width: 1024px) {
+    .tablet-grid {
+        @apply grid-cols-2 gap-4;
+    }
+}
+
+/* Desktop improvements */
+@media (min-width: 1025px) {
+    .desktop-grid {
+        @apply grid-cols-3 gap-6;
+    }
+}
+
+/* Print styles */
+@media print {
+    .no-print {
+        display: none !important;
+    }
+    
+    .print-break {
+        page-break-after: always;
+    }
+}
