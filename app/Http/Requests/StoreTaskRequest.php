@@ -28,7 +28,7 @@ class StoreTaskRequest extends FormRequest
             "description" => ['nullable', 'string'],
             'due_date' => ['nullable', 'date'],
             'project_id' => ['required', 'exists:brands,id'],
-            'assigned_user_id' => ['nullable', 'exists:users,id'],
+            'assigned_user_id' => ['required', 'exists:users,id'],
             'status' => [
                 'required',
                 Rule::in(['Inactive', 'Active', 'completed'])

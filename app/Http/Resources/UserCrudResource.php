@@ -22,6 +22,9 @@ class UserCrudResource extends JsonResource
             "name" => $this->name,
             "email" => $this->email,
             'created_at' => (new Carbon($this->created_at))->format('Y-m-d H:i:s'),
+            'brands' => $this->whenLoaded('assignedBrands', function () {
+                return $this->assignedBrands->map(fn($b) => ['id' => $b->id, 'name' => $b->name]);
+            }),
         ];
     }
 }

@@ -12,6 +12,9 @@ class UpdateTaskRequest extends FormRequest
      */
     public function authorize(): bool
     {
+        // Use TaskPolicy to determine if the user can perform the update.
+        // The controller calls $this->authorize('update', $task) so this returns
+        // true here and the actual authorization is enforced in the controller.
         return true;
     }
 
@@ -22,7 +25,12 @@ class UpdateTaskRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
+        // Allow partial updates for team users (only status and description).
+        $user = $this->user();
+        $roles = ($user->roles ?? collect())->pluck('name')->map(fn($r) => strtolower($r));
+
+        // Default full rules for admins and managers
+        $fullRules = [
             "name" => ['required', 'max:255'],
             'image' => ['nullable', 'image'],
             "description" => ['nullable', 'string'],
@@ -38,5 +46,18 @@ class UpdateTaskRequest extends FormRequest
                 Rule::in(['low', 'medium', 'high'])
             ]
         ];
+
+        if ($roles->contains('teamuser')) {
+            // Team users can only send status and/or description
+            return [
+                'description' => ['nullable', 'string'],
+                'status' => [
+                    'required',
+                    Rule::in(['Inactive', 'Active', 'completed'])
+                ],
+            ];
+        }
+
+        return $fullRules;
     }
 }

@@ -3,6 +3,7 @@ import InputLabel from "@/Components/InputLabel";
 import SelectInput from "@/Components/SelectInput";
 import TextAreaInput from "@/Components/TextAreaInput";
 import TextInput from "@/Components/TextInput";
+import DatePicker from "@/Components/DatePicker";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { Head, Link, useForm } from "@inertiajs/react";
 
@@ -108,9 +109,8 @@ export default function Create({ auth, managers = [] }) {
 
               <div className="mt-4">
                 <InputLabel htmlFor="brand_started_on" value="Started On" />
-                <TextInput
+                <DatePicker
                   id="brand_started_on"
-                  type="date"
                   name="started_on"
                   value={data.started_on}
                   className="form-input mt-1"

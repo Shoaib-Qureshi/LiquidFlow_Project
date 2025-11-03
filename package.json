@@ -20,6 +20,8 @@
         "vite": "^5.0"
     },
     "dependencies": {
-        "@heroicons/react": "^2.1.1"
+        "@heroicons/react": "^2.1.1",
+        "flatpickr": "^4.6.13",
+        "react-flatpickr": "^4.0.11"
     }
 }

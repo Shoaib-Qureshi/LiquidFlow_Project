@@ -17,7 +17,7 @@ class Brand extends Model
         'description',
         'status',
         'created_by',
-        // Extended fields
+        'client_id',
         'audience',
         'other_details',
         'started_on',
@@ -25,6 +25,22 @@ class Brand extends Model
         'logo_path',
         'file_path',
     ];
+
+    /**
+     * Casts for model attributes
+     */
+    protected $casts = [
+        'started_on' => 'date',
+        'in_progress' => 'boolean',
+    ];
+
+    /**
+     * Client that owns the brand.
+     */
+    public function client(): BelongsTo
+    {
+        return $this->belongsTo(Client::class);
+    }
 
     /**
      * Get all tasks associated with this brand
@@ -59,5 +75,4 @@ class Brand extends Model
     {
         return $this->belongsTo(User::class, 'created_by');
     }
-
 }

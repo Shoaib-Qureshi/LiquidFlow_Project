@@ -1,5 +1,4 @@
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
-import { USER_STATUS_CLASS_MAP, USER_STATUS_TEXT_MAP } from "@/constants.jsx";
 import { Head, Link } from "@inertiajs/react";
 import {
   TASK_PRIORITY_CLASS_MAP,
@@ -12,12 +11,16 @@ import axios from "axios";
 
 
 export default function Show({ auth, task, initialComments }) { // Accept initialComments as a prop
-
   const [comments, setComments] = useState(initialComments || []); // Initialize with comments from backend
   const [newComment, setNewComment] = useState("");
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
 
   const handleCommentSubmit = async (e) => {
     e.preventDefault();
+
+    if (!newComment.trim() || isSubmittingComment) return;
+
+    setIsSubmittingComment(true);
 
     try {
       const response = await axios.post(route("comments.store"), {
@@ -26,11 +29,14 @@ export default function Show({ auth, task, initialComments }) { // Accept initia
       });
 
       if (response.data.success) {
-        setComments([...comments, response.data.comment]); // Add new comment to the list
+        // Append the returned comment object (server should return saved comment)
+        setComments((prev) => [...prev, response.data.comment]);
         setNewComment(""); // Clear the input field
       }
     } catch (error) {
       console.error("Error submitting the comment:", error);
+    } finally {
+      setIsSubmittingComment(false);
     }
   };
 
@@ -44,7 +50,7 @@ export default function Show({ auth, task, initialComments }) { // Accept initia
           </h2>
           <Link
             href={route("task.edit", task.id)}
-            className="btn-primary"
+            className="bg-emerald-500 py-1 px-3 text-white rounded shadow transition-all hover:bg-emerald-600"
           >
             Edit
           </Link>
@@ -57,32 +63,35 @@ export default function Show({ auth, task, initialComments }) { // Accept initia
       <Head title={`Task "${task.name}"`} />
       <div className="py-12">
         <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
-          <div className="card-soft overflow-hidden">
-            <div>
-              <img
-                src={task.image_path}
-                alt=""
-                className="w-full h-64 object-cover"
-              />
-            </div>
-            <div className="p-6">
-              <div className="grid gap-1 grid-cols-2 mt-2">
+          <div className="border rounded-lg bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
+            {task.image_path && (
+              <div className="w-full h-64 overflow-hidden">
+                <img
+                  src={task.image_path}
+                  alt=""
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
+
+            <div className="p-6 text-gray-900 dark:text-gray-100">
+              <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
                 <div>
                   <div>
-                    <label className="font-bold text-lg">Task ID</label>
-                    <p className="mt-1">{task.id}</p>
+                    <label className="font-semibold text-sm text-gray-600">Task ID</label>
+                    <p className="mt-1 text-lg font-medium">{task.id}</p>
                   </div>
                   <div className="mt-4">
-                    <label className="font-bold text-lg">Task Name</label>
-                    <p className="mt-1">{task.name}</p>
+                    <label className="font-semibold text-sm text-gray-600">Task Name</label>
+                    <p className="mt-1 text-xl font-semibold">{task.name}</p>
                   </div>
 
                   <div className="mt-4">
-                    <label className="font-bold text-lg">Task Status</label>
-                    <p className="mt-1">
+                    <label className="font-semibold text-sm text-gray-600">Task Status</label>
+                    <p className="mt-2">
                       <span
                         className={
-                          "px-2 py-1 rounded text-white " +
+                          "inline-block px-3 py-1 rounded-full text-white text-sm " +
                           TASK_STATUS_CLASS_MAP[task.status]
                         }
                       >
@@ -92,11 +101,11 @@ export default function Show({ auth, task, initialComments }) { // Accept initia
                   </div>
 
                   <div className="mt-4">
-                    <label className="font-bold text-lg">Task Priority</label>
-                    <p className="mt-1">
+                    <label className="font-semibold text-sm text-gray-600">Task Priority</label>
+                    <p className="mt-2">
                       <span
                         className={
-                          "px-2 py-1 rounded text-white " +
+                          "inline-block px-3 py-1 rounded-full text-white text-sm " +
                           TASK_PRIORITY_CLASS_MAP[task.priority]
                         }
                       >
@@ -105,30 +114,30 @@ export default function Show({ auth, task, initialComments }) { // Accept initia
                     </p>
                   </div>
                   <div className="mt-4">
-                    <label className="font-bold text-lg">Created By</label>
-                    <p className="mt-1">{task.createdBy.name}</p>
+                    <label className="font-semibold text-sm text-gray-600">Created By</label>
+                    <p className="mt-1 text-sm">{task.createdBy.name}</p>
                   </div>
                 </div>
                 <div>
                   <div>
-                    <label className="font-bold text-lg">Due Date</label>
-                    <p className="mt-1">{task.due_date}</p>
+                    <label className="font-semibold text-sm text-gray-600">Due Date</label>
+                    <p className="mt-1 text-sm">{task.due_date}</p>
                   </div>
                   <div className="mt-4">
-                    <label className="font-bold text-lg">Create Date</label>
-                    <p className="mt-1">{task.created_at}</p>
+                    <label className="font-semibold text-sm text-gray-600">Create Date</label>
+                    <p className="mt-1 text-sm">{task.created_at}</p>
                   </div>
                   <div className="mt-4">
-                    <label className="font-bold text-lg">Updated By</label>
-                    <p className="mt-1">{task.updatedBy.name}</p>
+                    <label className="font-semibold text-sm text-gray-600">Updated By</label>
+                    <p className="mt-1 text-sm">{task.updatedBy.name}</p>
                   </div>
                   <div className="mt-4">
-                    <label className="font-bold text-lg">Brand</label>
-                    <p className="mt-1">
+                    <label className="font-semibold text-sm text-gray-600">Brand</label>
+                    <p className="mt-1 text-sm">
                       {task.project ? (
                         <Link
                           href={route("project.show", task.project.id)}
-                          className="hover:underline"
+                          className="text-emerald-600 hover:underline"
                         >
                           {task.project.name}
                         </Link>
@@ -138,19 +147,34 @@ export default function Show({ auth, task, initialComments }) { // Accept initia
                     </p>
                   </div>
                   <div className="mt-4">
-                    <label className="font-bold text-lg">Assigned User</label>
-                    <p className="mt-1">{task.assignedUser?.name || 'Not assigned'}</p>
-                  </div>
-                  <div className="mt-4">
-                    <label className="font-bold text-lg">Assigned By</label>
-                    <p className="mt-1">{task.createdBy?.name || 'N/A'}</p>
+                    <label className="font-semibold text-sm text-gray-600">Team Member Assignment</label>
+                    <div className="mt-2 space-y-2">
+                      <div className="flex items-center text-sm text-align-left">
+                        <span className="text-gray-600 w-32">Assigned To:</span>
+                        <span className={` py-1 ${task.assignedUser?.name ? 'text-emerald-700 font-medium' : 'text-gray-500 italic'}`}>
+                          {task.assignedUser?.name || 'Not assigned'}
+                        </span>
+                      </div>
+                      <div className="flex items-center text-sm">
+                        <span className="text-gray-600 w-32">Assigned By:</span>
+                        <span className="text-emerald-700">
+                          {task.createdBy?.name || 'N/A'}
+                        </span>
+                      </div>
+                      <div className="flex items-center text-sm">
+                        <span className="text-gray-600 w-32">Last Updated:</span>
+                        <span className="text-gray-800">
+                          {task.updated_at} by {task.updatedBy?.name}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-4">
-                <label className="font-bold text-lg">Task Description</label>
-                <p className="mt-1">{task.description}</p>
+              <div className="mt-6">
+                <label className="font-semibold text-sm text-gray-600">Task Description</label>
+                <p className="mt-2 text-base leading-relaxed text-gray-700">{task.description}</p>
               </div>
             </div>
           </div>
@@ -159,42 +183,62 @@ export default function Show({ auth, task, initialComments }) { // Accept initia
 
 
       {/* Comments section */}
-      <div className="py-2">
+      <div className="py-6">
         <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
-          <div className="card-soft">
-            <div className="mt-4 px-6 pb-2">
-              <h3 className="font-bold text-lg">Comments</h3>
+          <div className="border rounded-lg bg-white dark:bg-gray-800 shadow-sm overflow-hidden p-6">
+            <div>
+              <h3 className="font-semibold text-lg mb-4">Comments</h3>
+
               {comments.length > 0 ? (
-                comments.map((comment) => (
-                  <div key={comment.id} className="mt-3 bg-slate-50	p-3 rounded">
-                    <p className="text-sm text-gray-600">{comment.user.name}</p>
-                    <p className="text-base">{comment.comment}</p>
-                    <p className="text-xs text-gray-500">{comment.created_at}</p>
-                  </div>
-                ))
+                <div className="space-y-3">
+                  {comments.map((comment) => (
+                    <div key={comment.id} className="p-3 bg-slate-50 rounded">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-gray-700 font-medium">{comment.user.name}</p>
+                          <p className="text-xs text-gray-500">{comment.created_at}</p>
+                        </div>
+                      </div>
+                      <div className="mt-2">
+                        <p className="text-sm text-gray-800">{comment.comment}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               ) : (
-                <p>No comments yet.</p>
+                <p className="text-sm text-gray-500">No comments yet.</p>
               )}
             </div>
 
             {/* Comment form */}
-            <div className="mt-4 px-6 pb-6">
-              <h3 className="font-bold text-lg">Add a Comment</h3>
-              <form onSubmit={handleCommentSubmit}>
+            <div className="mt-6">
+              <h4 className="font-semibold text-sm">Add a Comment</h4>
+              <form onSubmit={handleCommentSubmit} className="mt-2">
                 <textarea
                   name="comment"
-                  className="form-input p-2 rounded w-full mt-2"
+                  className="border p-3 rounded w-full mt-2 min-h-[80px] resize-none"
                   placeholder="Write your comment here..."
                   required
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
                 ></textarea>
-                <button
-                  type="submit"
-                  className="btn-primary mt-4"
-                >
-                  Submit
-                </button>
+                <div className="mt-3 flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    className="px-3 py-2 border rounded text-sm"
+                    onClick={() => setNewComment("")}
+                    disabled={isSubmittingComment}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className={`px-4 py-2 rounded text-white bg-emerald-600 hover:bg-emerald-700 text-sm ${isSubmittingComment ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    disabled={isSubmittingComment}
+                  >
+                    {isSubmittingComment ? 'Posting...' : 'Submit'}
+                  </button>
+                </div>
               </form>
             </div>
           </div>

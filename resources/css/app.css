@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+.flatpickr-calendar {
+    z-index: 9999 !important;
+}
+
 /* Base styles */
 @layer base {
     html {
@@ -15,10 +19,6 @@
 
 /* Component styles */
 @layer components {
-    .text-gray-100{
-        color: #212020 !important;
-    }
-
     /* Modern gradient background */
     .app-gradient {
         background: linear-gradient(180deg, #f8fafc 0%, #ffffff 40%, #f1f5f9 100%);
@@ -27,16 +27,11 @@
 
     /* Enhanced card styling */
     .card-soft {
-        background: white;
-        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-        border-radius: 0.75rem;
-        border: 1px solid rgba(229, 231, 235, 0.8);
-        transition: all 0.2s ease-in-out;
+        @apply bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl transition duration-200 ease-in-out text-gray-900 dark:text-gray-100 shadow-sm;
     }
 
     .card-soft:hover {
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        transform: translateY(-1px);
+        @apply shadow-lg -translate-y-px;
     }
 
     /* Brand badge with modern gradient */
@@ -53,29 +48,29 @@
     }
 
     .btn-secondary {
-        @apply inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest shadow-sm hover:text-gray-500 focus:outline-none focus:border-blue-300 focus:ring ring-blue-200 active:text-gray-800 active:bg-gray-50 disabled:opacity-25 transition ease-in-out duration-150;
+        @apply inline-flex items-center px-4 py-2 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-md font-semibold text-xs text-gray-700 dark:text-gray-200 uppercase tracking-widest shadow-sm hover:text-gray-500 dark:hover:text-gray-100 focus:outline-none focus:border-blue-300 focus:ring ring-blue-200 active:text-gray-800 active:bg-gray-50 dark:active:bg-slate-700 disabled:opacity-25 transition ease-in-out duration-150;
     }
 
     /* Form enhancements */
     .form-input {
-        @apply block w-full border-gray-300 focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 rounded-md shadow-sm;
+        @apply block w-full border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-gray-100 focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 rounded-md shadow-sm placeholder-gray-400 dark:placeholder-gray-500;
     }
 
     .form-select {
-        @apply block w-full border-gray-300 focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 rounded-md shadow-sm;
+        @apply block w-full border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-gray-100 focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 rounded-md shadow-sm;
     }
 
     /* Table enhancements */
     .table-responsive {
-        @apply min-w-full divide-y divide-gray-200 overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg;
+        @apply min-w-full divide-y divide-gray-200 dark:divide-slate-700 overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg bg-white dark:bg-slate-900;
     }
 
     .table-header {
-        @apply px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50;
+        @apply px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider bg-gray-50 dark:bg-slate-800;
     }
 
     .table-cell {
-        @apply px-6 py-4 whitespace-nowrap text-sm text-gray-900;
+        @apply px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100;
     }
 
     /* Status badges */

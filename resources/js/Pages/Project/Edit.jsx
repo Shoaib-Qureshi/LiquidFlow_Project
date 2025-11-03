@@ -3,6 +3,7 @@ import InputLabel from "@/Components/InputLabel";
 import SelectInput from "@/Components/SelectInput";
 import TextAreaInput from "@/Components/TextAreaInput";
 import TextInput from "@/Components/TextInput";
+import DatePicker from "@/Components/DatePicker";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { Head, Link, useForm } from "@inertiajs/react";
 
@@ -127,9 +128,8 @@ export default function Create({ auth, project }) {
                   value="Project Deadline"
                 />
 
-                <TextInput
+                <DatePicker
                   id="project_due_date"
-                  type="date"
                   name="due_date"
                   value={data.due_date}
                   className="mt-1 block w-full"

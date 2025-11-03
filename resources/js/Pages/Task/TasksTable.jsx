@@ -109,7 +109,7 @@ export default function TasksTable({
   return (
     <div className="space-y-6">
       {success && (
-        <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-md animate-fade-in">
+        <div className="bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/40 text-green-800 dark:text-green-200 px-4 py-3 rounded-md animate-fade-in">
           <div className="flex">
             <svg className="w-5 h-5 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -157,7 +157,7 @@ export default function TasksTable({
               ))}
             </SelectInput>
           </div>
-          <div className="flex items-center text-sm text-gray-500">
+          <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
             Showing {tasks.data.length} tasks
           </div>
         </div>
@@ -166,28 +166,28 @@ export default function TasksTable({
       {/* Desktop Table View */}
       <div className="hidden lg:block card-soft overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700 text-gray-900 dark:text-gray-100">
+            <thead className="bg-gray-50 dark:bg-slate-800">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Image</th>
-                {!hideProjectColumn && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Brand</th>}
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Task Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created By</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">ID</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Image</th>
+                {!hideProjectColumn && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Brand</th>}
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Task Name</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Created</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Created By</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white dark:bg-slate-900 divide-y divide-gray-200 dark:divide-slate-800">
               {tasks.data.map((task) => (
-                <tr key={task.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{task.id}</td>
+                <tr key={task.id} className="hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">{task.id}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {task.image_path ? (
                       <img src={task.image_path} alt="task" className="w-12 h-8 object-cover rounded-md shadow-sm" />
                     ) : (
-                      <div className="w-12 h-8 bg-gray-100 rounded-md flex items-center justify-center">
+                      <div className="w-12 h-8 bg-gray-100 dark:bg-slate-800 rounded-md flex items-center justify-center">
                         <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
@@ -195,12 +195,12 @@ export default function TasksTable({
                     )}
                   </td>
                   {!hideProjectColumn && (
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                       {task.brand?.name || task.project?.name || 'No Brand'}
                     </td>
                   )}
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <Link href={route('task.show', task.id)} className="text-blue-600 hover:text-blue-900 font-medium hover:underline">
+                    <Link href={route('task.show', task.id)} className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 font-medium hover:underline">
                       {task.name}
                     </Link>
                   </td>
@@ -209,16 +209,16 @@ export default function TasksTable({
                       {TASK_STATUS_TEXT_MAP[task.status]}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {new Date(task.created_at).toLocaleDateString()}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                     {task.createdBy?.name || 'Unknown'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex items-center space-x-2">
                       {canEditTasks && (
-                        <Link href={route('task.edit', task.id)} className="text-indigo-600 hover:text-indigo-900">
+                        <Link href={route('task.edit', task.id)} className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300">
                           Edit
                         </Link>
                       )}
@@ -226,7 +226,7 @@ export default function TasksTable({
                         <button 
                           onClick={() => deleteTask(task)} 
                           disabled={isDeleting === task.id}
-                          className="text-red-600 hover:text-red-900 disabled:opacity-50"
+                          className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300 disabled:opacity-50"
                         >
                           {isDeleting === task.id ? <LoadingSpinner size="sm" /> : 'Delete'}
                         </button>
@@ -249,7 +249,7 @@ export default function TasksTable({
                 {task.image_path ? (
                   <img src={task.image_path} alt="task" className="w-16 h-12 object-cover rounded-md" />
                 ) : (
-                  <div className="w-16 h-12 bg-gray-100 rounded-md flex items-center justify-center">
+                  <div className="w-16 h-12 bg-gray-100 dark:bg-slate-800 rounded-md flex items-center justify-center">
                     <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
@@ -258,14 +258,14 @@ export default function TasksTable({
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">
-                  <Link href={route('task.show', task.id)} className="text-lg font-semibold text-gray-900 hover:text-blue-600">
+                  <Link href={route('task.show', task.id)} className="text-lg font-semibold text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400">
                     {task.name}
                   </Link>
                   <span className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${TASK_STATUS_CLASS_MAP[task.status]}`}>
                     {TASK_STATUS_TEXT_MAP[task.status]}
                   </span>
                 </div>
-                <div className="mt-2 space-y-1 text-sm text-gray-500">
+                <div className="mt-2 space-y-1 text-sm text-gray-500 dark:text-gray-400">
                   <div>ID: {task.id}</div>
                   {!hideProjectColumn && task.brand?.name && <div>Brand: {task.brand.name}</div>}
                   <div>Created: {new Date(task.created_at).toLocaleDateString()}</div>
@@ -273,7 +273,7 @@ export default function TasksTable({
                 </div>
                 <div className="mt-4 flex items-center space-x-4">
                   {canEditTasks && (
-                    <Link href={route('task.edit', task.id)} className="text-indigo-600 hover:text-indigo-900 font-medium">
+                    <Link href={route('task.edit', task.id)} className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300 font-medium">
                       Edit
                     </Link>
                   )}
@@ -281,7 +281,7 @@ export default function TasksTable({
                     <button 
                       onClick={() => deleteTask(task)} 
                       disabled={isDeleting === task.id}
-                      className="text-red-600 hover:text-red-900 font-medium disabled:opacity-50"
+                      className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300 font-medium disabled:opacity-50"
                     >
                       {isDeleting === task.id ? <LoadingSpinner size="sm" /> : 'Delete'}
                     </button>
@@ -300,7 +300,3 @@ export default function TasksTable({
     </div>
   );
 }
-
-
-
-

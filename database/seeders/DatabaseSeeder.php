@@ -16,6 +16,7 @@ class DatabaseSeeder extends Seeder
     {
         // Run the unified seeder for roles, permissions, and test users
         $this->call([
+            PlanSeeder::class,
             UnifiedRoleAndUserSeeder::class,
             BrandSeeder::class
         ]);

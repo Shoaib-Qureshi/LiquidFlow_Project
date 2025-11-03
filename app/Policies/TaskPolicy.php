@@ -33,6 +33,17 @@ class TaskPolicy
             return true;
         }
 
+        // Team users can view tasks assigned to them or tasks under brands they are assigned to
+        if ($user->hasRole('TeamUser')) {
+            if ($task->assigned_user_id === $user->id) {
+                return true;
+            }
+            if ($task->brand && $task->brand->teamUsers()->where('user_id', $user->id)->exists()) {
+                return true;
+            }
+            return false;
+        }
+
         return $task->assigned_user_id === $user->id;
     }
 
@@ -59,7 +70,7 @@ class TaskPolicy
             return true;
         }
 
-        return false;
+        return $task->assigned_user_id === $user->id;
     }
 
     /**

@@ -17,6 +17,7 @@ use Illuminate\Support\Str;
 use App\Services\GmailApiService;
 use App\Helpers\AdminNotifier;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class TaskController extends Controller
 {
@@ -55,17 +56,29 @@ class TaskController extends Controller
      */
     public function index()
     {
+        /** @var \App\Models\User $user */
         $user = Auth::user();
+        $roles = ($user->roles ?? collect())->pluck('name')->map(fn($r) => strtolower($r));
         $query = Task::query()->with(['assignedUser', 'project', 'brand', 'createdBy']);
 
-        // Filter tasks based on user role
-        if ($user->hasRole('Admin')) {
-            // Admin can see all tasks
-        } elseif ($user->hasRole('Manager')) {
-            // Manager can only see tasks associated with their brands
-            $query->whereHas('brand.managers', function ($q) use ($user) {
+        $brandFilterIds = null;
+        if ($roles->contains('manager')) {
+            $brandFilterIds = \App\Models\Brand::whereHas('managers', function ($q) use ($user) {
                 $q->where('user_id', $user->id);
-            });
+            })->pluck('id');
+            if ($brandFilterIds->isEmpty()) {
+                $brandFilterIds = collect([-1]); // ensure no tasks returned
+            }
+            $query->whereIn('brand_id', $brandFilterIds);
+        } elseif ($roles->contains('teamuser')) {
+            // Team members only see tasks for brands they are assigned to
+            $brandFilterIds = \App\Models\Brand::whereHas('teamUsers', function ($q) use ($user) {
+                $q->where('user_id', $user->id);
+            })->pluck('id');
+            if ($brandFilterIds->isEmpty()) {
+                $brandFilterIds = collect([-1]);
+            }
+            $query->whereIn('brand_id', $brandFilterIds);
         }
 
         $sortField = request("sort_field", 'created_at');
@@ -85,13 +98,11 @@ class TaskController extends Controller
             ->paginate(10)
             ->onEachSide(1);
 
-        // Get brands for filter dropdown (role-aware)
-        if ($user->hasRole('Admin')) {
-            $brands = \App\Models\Brand::orderBy('name')->get(['id', 'name']);
+        // Get brands for filter dropdown
+        if ($roles->contains('manager') || $roles->contains('teamuser')) {
+            $brands = \App\Models\Brand::whereIn('id', $brandFilterIds)->orderBy('name')->get(['id', 'name']);
         } else {
-            $brands = \App\Models\Brand::whereHas('managers', function ($q) use ($user) {
-                $q->where('user_id', $user->id);
-            })->orderBy('name')->get(['id', 'name']);
+            $brands = \App\Models\Brand::orderBy('name')->get(['id', 'name']);
         }
 
         return inertia("Task/Index", [
@@ -110,21 +121,31 @@ class TaskController extends Controller
         $user = Auth::user();
 
         // Only Admin and Manager can create tasks
-        if (!$user->hasRole('Admin') && !$user->hasRole('Manager')) {
+        $roles = ($user->roles ?? collect())->pluck('name')->map(fn($r) => strtolower($r));
+        if (!$roles->contains('admin') && !$roles->contains('manager')) {
             abort(403, 'You are not authorized to create tasks.');
         }
 
-        // Get available brands for task creation (role-aware)
-        if ($user->hasRole('Admin')) {
-            $brands = \App\Models\Brand::orderBy('name', 'asc')->get();
-        } else {
-            $brands = \App\Models\Brand::whereHas('managers', function ($q) use ($user) {
+        // Get available brands for task creation, restricting managers to their brands
+        $brandsQuery = \App\Models\Brand::orderBy('name', 'asc');
+        if ($roles->contains('manager')) {
+            $brandsQuery->whereHas('managers', function ($q) use ($user) {
                 $q->where('user_id', $user->id);
-            })->orderBy('name', 'asc')->get();
+            });
+        }
+        $brands = $brandsQuery->get();
+
+        // Optional preselected brand (when navigating from a specific brand page)
+        $preselectedBrandId = null;
+        if (request()->filled('brand_id')) {
+            $candidate = (int) request('brand_id');
+            if ($brands->contains('id', $candidate)) {
+                $preselectedBrandId = $candidate;
+            }
         }
 
         // Convert brands to the format expected by the frontend
-        $projects = $brands->map(function($brand) {
+        $projects = $brands->map(function ($brand) {
             return [
                 'id' => $brand->id,
                 'name' => $brand->name,
@@ -133,22 +154,24 @@ class TaskController extends Controller
             ];
         });
 
-        // Optional preselected brand (when navigating from a specific brand page)
-        $preselectedBrandId = null;
-        if (request()->filled('brand_id')) {
-            $candidate = (int) request('brand_id');
-            if (\App\Models\Brand::whereKey($candidate)->exists()) {
-                $preselectedBrandId = $candidate;
-            }
-        }
-
         // Filter users based on current user's role
-        if ($user->hasRole('Manager')) {
-            // Managers can only assign tasks to other Managers and themselves, not to Admins
-            $users = User::role(['Manager'])->orderBy('name', 'asc')->get();
+        if ($roles->contains('manager')) {
+            $managedBrandIds = $brands->pluck('id');
+
+            if ($managedBrandIds->isEmpty()) {
+                $users = collect();
+            } else {
+                $users = User::whereHas('roles', function ($q) {
+                    $q->where('name', 'TeamUser');
+                })->whereHas('assignedBrands', function ($q) use ($managedBrandIds) {
+                    $q->whereIn('brands.id', $managedBrandIds);
+                })->orderBy('name', 'asc')->get();
+            }
         } else {
-            // Admins can assign tasks to both Managers and Admins
-            $users = User::role(['Manager', 'Admin'])->orderBy('name', 'asc')->get();
+            // Admins can assign tasks to any team member
+            $users = User::whereHas('roles', function ($q) {
+                $q->where('name', 'TeamUser');
+            })->orderBy('name', 'asc')->get();
         }
 
         return inertia("Task/Create", [
@@ -166,7 +189,8 @@ class TaskController extends Controller
         $user = Auth::user();
 
         // Only Admin and Manager can create tasks
-        if (!$user->hasRole('Admin') && !$user->hasRole('Manager')) {
+        $roles = ($user->roles ?? collect())->pluck('name')->map(fn($r) => strtolower($r));
+        if (!$roles->contains('admin') && !$roles->contains('manager')) {
             abort(403, 'You are not authorized to create tasks.');
         }
 
@@ -174,19 +198,41 @@ class TaskController extends Controller
         $data['created_by'] = Auth::id();
         $data['updated_by'] = Auth::id();
 
-        // Handle empty assigned_user_id
-        if (empty($data['assigned_user_id'])) {
-            $data['assigned_user_id'] = null;
-        }
-
         // Map project_id to brand_id for consistency.
-        // Keep project_id present so existing non-null DB column is satisfied.
         if (isset($data['project_id'])) {
             $data['brand_id'] = $data['project_id'];
-            // NOTE: we intentionally DO NOT unset project_id here; some installs still
-            // have a non-null project_id column, so leaving it populated avoids
-            // NOT NULL constraint failures. If you later migrate project_id to be
-            // nullable or repoint it to brands, you can remove this.
+            // Remove project_id to avoid inserting into non-existent column on newer schemas
+            unset($data['project_id']);
+        }
+
+        if ($roles->contains('manager')) {
+            $managerBrandIds = \App\Models\Brand::whereHas('managers', function ($q) use ($user) {
+                $q->where('user_id', $user->id);
+            })->pluck('id');
+
+            if ($managerBrandIds->isEmpty()) {
+                throw ValidationException::withMessages([
+                    'project_id' => 'No brands are assigned to you. Please contact an administrator.',
+                ]);
+            }
+
+            if (!empty($data['brand_id']) && !$managerBrandIds->contains((int) $data['brand_id'])) {
+                throw ValidationException::withMessages([
+                    'project_id' => 'You are not authorized to create tasks for this brand.',
+                ]);
+            }
+
+            $teamUserIds = User::whereHas('roles', function ($q) {
+                $q->where('name', 'TeamUser');
+            })->whereHas('assignedBrands', function ($q) use ($managerBrandIds) {
+                $q->whereIn('brands.id', $managerBrandIds);
+            })->pluck('id');
+
+            if (!$teamUserIds->contains((int) $data['assigned_user_id'])) {
+                throw ValidationException::withMessages([
+                    'assigned_user_id' => 'You can only assign tasks to your team members.',
+                ]);
+            }
         }
 
         $task = Task::create($data);
@@ -201,25 +247,45 @@ class TaskController extends Controller
     public function show(Task $task)
     {
         $user = Auth::user();
+        $roles = ($user->roles ?? collect())->pluck('name')->map(fn($r) => strtolower($r));
 
         // Load the createdBy relationship and comments
         $task->load(['assignedUser', 'project', 'brand', 'createdBy', 'comments.user']);
 
-        // Admin sees all brands; Manager sees only associated brands
-        if ($user->hasRole('Admin')) {
-            $brands = \App\Models\Brand::orderBy('name', 'asc')->get();
-        } else {
+        // Get available brands based on user role
+        if ($roles->contains('manager')) {
+            // Managers only see their managed brands
             $brands = \App\Models\Brand::whereHas('managers', function ($q) use ($user) {
                 $q->where('user_id', $user->id);
             })->orderBy('name', 'asc')->get();
+        } else {
+            // Admins see all brands
+            $brands = \App\Models\Brand::orderBy('name', 'asc')->get();
         }
 
-        // Show managers and admins for assignment
-        $users = User::role(['Manager', 'Admin'])->orderBy('name', 'asc')->get();
+        // Get users for assignment based on role
+        if ($roles->contains('manager')) {
+            // Managers only see their team members
+            $users = User::whereHas('roles', function ($q) {
+                $q->where('name', 'TeamUser');
+            })->whereHas('assignedBrands', function ($q) use ($user) {
+                $q->whereIn('brands.id', function ($subquery) use ($user) {
+                    $subquery->select('brands.id')
+                        ->from('brands')
+                        ->join('brand_managers', 'brands.id', '=', 'brand_managers.brand_id')
+                        ->where('brand_managers.user_id', $user->id);
+                });
+            })->orderBy('name', 'asc')->get();
+        } else {
+            // Admins see all team members
+            $users = User::whereHas('roles', function ($q) {
+                $q->where('name', 'TeamUser');
+            })->orderBy('name', 'asc')->get();
+        }
 
         return inertia("Task/Show", [
             'task' => new TaskResource($task),
-            'initialComments' => $task->comments->map(function($comment) {
+            'initialComments' => $task->comments->map(function ($comment) {
                 return [
                     'id' => $comment->id,
                     'comment' => $comment->comment,
@@ -230,7 +296,7 @@ class TaskController extends Controller
                     ]
                 ];
             }),
-            'projects' => $brands->map(function($brand) {
+            'projects' => $brands->map(function ($brand) {
                 return [
                     'id' => $brand->id,
                     'name' => $brand->name,
@@ -247,19 +313,55 @@ class TaskController extends Controller
     public function edit(Task $task)
     {
         $user = Auth::user();
+        $roles = ($user->roles ?? collect())->pluck('name')->map(fn($r) => strtolower($r));
 
         // Load the createdBy relationship
         $task->load(['assignedUser', 'project', 'brand', 'createdBy']);
 
-        // For now, let both Admin and Manager see all brands
-        $brands = \App\Models\Brand::orderBy('name', 'asc')->get();
+        $isTeamUser = $roles->contains('teamuser');
+        $isManager = $roles->contains('manager');
+        $isAdmin = $roles->contains('admin');
 
-        // Show managers and admins for assignment
-        $users = User::role(['Manager', 'Admin'])->orderBy('name', 'asc')->get();
+        // Get available brands based on user role
+        if ($isManager) {
+            // Managers only see their managed brands
+            $brands = \App\Models\Brand::whereHas('managers', function ($q) use ($user) {
+                $q->where('user_id', $user->id);
+            })->orderBy('name', 'asc')->get();
+        } elseif ($isAdmin) {
+            // Admins see all brands
+            $brands = \App\Models\Brand::orderBy('name', 'asc')->get();
+        } else {
+            // Team users see only the task's brand (read-only)
+            $brands = \App\Models\Brand::where('id', $task->brand_id)->get();
+        }
+
+        // Get users for assignment based on role
+        if ($isManager) {
+            // Managers only see their team members
+            $users = User::whereHas('roles', function ($q) {
+                $q->where('name', 'TeamUser');
+            })->whereHas('assignedBrands', function ($q) use ($user) {
+                $q->whereIn('brands.id', function ($subquery) use ($user) {
+                    $subquery->select('brands.id')
+                        ->from('brands')
+                        ->join('brand_managers', 'brands.id', '=', 'brand_managers.brand_id')
+                        ->where('brand_managers.user_id', $user->id);
+                });
+            })->orderBy('name', 'asc')->get();
+        } elseif ($isAdmin) {
+            // Admins see all team members
+            $users = User::whereHas('roles', function ($q) {
+                $q->where('name', 'TeamUser');
+            })->orderBy('name', 'asc')->get();
+        } else {
+            // Team users don't see the user assignment dropdown
+            $users = collect([]);
+        }
 
         return inertia("Task/Edit", [
             'task' => new TaskResource($task),
-            'projects' => $brands->map(function($brand) {
+            'projects' => $brands->map(function ($brand) {
                 return [
                     'id' => $brand->id,
                     'name' => $brand->name,
@@ -267,6 +369,7 @@ class TaskController extends Controller
                 ];
             }),
             'users' => UserResource::collection($users),
+            'isTeamUser' => $isTeamUser, // Pass this to frontend to control UI
         ]);
     }
 
@@ -275,22 +378,21 @@ class TaskController extends Controller
      */
     public function update(UpdateTaskRequest $request, Task $task)
     {
-        $user = Auth::user();
-
-        // Only Admin and Manager can update tasks
-        if (!$user->hasRole('Admin') && !$user->hasRole('Manager')) {
-            abort(403, 'You are not authorized to update tasks.');
-        }
+        // Authorize the action using the TaskPolicy. The policy will allow Admins,
+        // Managers, and TeamUsers (for limited fields) as implemented in
+        // App\Policies\TaskPolicy::update
+        $this->authorize('update', $task);
 
         $data = $request->validated();
         $image = $data['image'] ?? null;
         $data['updated_by'] = Auth::id();
-        
+
         // Map project_id to brand_id for consistency
         if (isset($data['project_id'])) {
             $data['brand_id'] = $data['project_id'];
+            unset($data['project_id']);
         }
-        
+
         if ($image) {
             if ($task->image_path) {
                 Storage::disk('public')->deleteDirectory(dirname($task->image_path));
@@ -312,7 +414,8 @@ class TaskController extends Controller
         $user = Auth::user();
 
         // Only Admin and Manager can delete tasks
-        if (!$user->hasRole('Admin') && !$user->hasRole('Manager')) {
+        $roles = ($user->roles ?? collect())->pluck('name')->map(fn($r) => strtolower($r));
+        if (!$roles->contains('admin') && !$roles->contains('manager')) {
             abort(403, 'You are not authorized to delete tasks.');
         }
 
@@ -329,7 +432,26 @@ class TaskController extends Controller
     public function myTasks()
     {
         $user = auth()->user();
-        $query = Task::query()->where('assigned_user_id', $user->id)->with(['assignedUser', 'project', 'brand', 'createdBy']);
+        $query = Task::query()->with(['assignedUser', 'project', 'brand', 'createdBy']);
+
+        $roles = ($user->roles ?? collect())->pluck('name')->map(fn($r) => strtolower($r));
+        if ($roles->contains('teamuser')) {
+            $brandIds = \App\Models\Brand::whereHas('teamUsers', function ($q) use ($user) {
+                $q->where('user_id', $user->id);
+            })->pluck('id');
+
+            if ($brandIds->isEmpty()) {
+                // only show tasks assigned to the user
+                $query->where('assigned_user_id', $user->id);
+            } else {
+                $query->where(function ($q) use ($user, $brandIds) {
+                    $q->where('assigned_user_id', $user->id)
+                        ->orWhereIn('brand_id', $brandIds);
+                });
+            }
+        } else {
+            $query->where('assigned_user_id', $user->id);
+        }
 
         $sortField = request("sort_field", 'created_at');
         $sortDirection = request("sort_direction", "desc");

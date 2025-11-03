@@ -36,6 +36,9 @@ class UpdateUserRequest extends FormRequest
                 'confirmed',
                 Password::min(8)->letters()->symbols(),
             ],
+            // Optional brand assignments when updating a user
+            'brand_ids' => ['nullable', 'array'],
+            'brand_ids.*' => ['integer', 'exists:brands,id'],
         ];
     }
 }

@@ -8,6 +8,8 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\ClientController;
+use App\Http\Controllers\SubscriptionStatusController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -25,18 +27,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('brands', BrandController::class);
     Route::get('/brands/{brand}', [BrandController::class, 'show'])
         ->name('brands.show');
-    // Secure file serving for brand assets
+    Route::post('/brands/{brand}/managers', [BrandController::class, 'assignManagers'])
+        ->name('brands.assign-managers');
     Route::get('/brands/{brand}/logo', [BrandController::class, 'logo'])
         ->name('brands.logo');
     Route::get('/brands/{brand}/guideline', [BrandController::class, 'guideline'])
         ->name('brands.guideline');
-    Route::post('/brands/{brand}/managers', [BrandController::class, 'assignManagers'])
-        ->name('brands.assign-managers');
 
     // Admin routes
-    Route::middleware(['role:Admin'])->group(function () {
+    Route::middleware([\Spatie\Permission\Middleware\RoleMiddleware::class . ':Admin'])->group(function () {
         Route::get('/roles', [RoleController::class, 'index'])->name('roles.index');
         Route::post('/roles/sync', [RoleController::class, 'syncUserRoles'])->name('roles.sync');
+        Route::resource('clients', ClientController::class);
 
         // Brand management routes for admin
         Route::post('/brands/{brand}/managers', [BrandController::class, 'assignManagers'])
@@ -44,7 +46,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     // Manager routes
-    Route::middleware(['role:Manager'])->group(function () {
+    Route::middleware([\Spatie\Permission\Middleware\RoleMiddleware::class . ':Manager'])->group(function () {
         // Manager-specific routes can be added here
     });
 
@@ -76,7 +78,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('/task/{task}/dependencies', [TaskController::class, 'updateDependencies'])
         ->name('task.dependencies.update');
     Route::resource('task', TaskController::class);
-    Route::resource('user', UserController::class);
+    // Allow both Admins and Managers to manage Team Members (Managers can create/edit team users)
+    Route::middleware([\Spatie\Permission\Middleware\RoleMiddleware::class . ':Admin|Manager'])->group(function () {
+        Route::resource('user', UserController::class);
+    });
+
+    Route::get('/subscriptions', [SubscriptionStatusController::class, 'index'])
+        ->name('subscriptions.index');
 });
 
 Route::middleware('auth')->group(function () {

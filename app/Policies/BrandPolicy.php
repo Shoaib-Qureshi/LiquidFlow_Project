@@ -43,10 +43,7 @@ class BrandPolicy
         }
 
         if ($user->hasRole('Manager')) {
-            // Check if manager already has a brand
-            return Brand::whereHas('managers', function ($q) use ($user) {
-                $q->where('user_id', $user->id);
-            })->count() === 0;
+            return true;
         }
 
         return false;
@@ -57,11 +54,21 @@ class BrandPolicy
      */
     public function update(User $user, Brand $brand): bool
     {
-        if ($user->hasRole('Admin')) {
+        $roleNames = $user->getRoleNames()->map(fn ($role) => strtolower($role));
+
+        if ($roleNames->contains('admin')) {
             return true;
         }
 
-        return $user->hasRole('Manager') && $brand->managers()->where('user_id', $user->id)->exists();
+        if ($user->hasAnyPermission(['manage brands', 'update brand', 'edit brand'])) {
+            return true;
+        }
+
+        if ($roleNames->contains('manager')) {
+            return $brand->managers()->where('user_id', $user->id)->exists();
+        }
+
+        return false;
     }
 
     /**

@@ -3,42 +3,69 @@ import InputLabel from "@/Components/InputLabel";
 import SelectInput from "@/Components/SelectInput";
 import TextAreaInput from "@/Components/TextAreaInput";
 import TextInput from "@/Components/TextInput";
+import DatePicker from "@/Components/DatePicker";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
+import { useEffect } from "react";
 import { Head, Link, useForm, usePage } from "@inertiajs/react";
 
 export default function Create(props) {
   const { props: pageProps } = usePage()
   const auth = pageProps?.auth ?? props?.auth ?? null
-  const managers = pageProps?.managers ?? []
+  const clients = pageProps?.clients ?? props?.clients ?? []
+  const hasClients = clients.length > 0
+  const preselectedClientId = pageProps?.preselectedClientId ?? props?.preselectedClientId ?? null
+  const clientSelectionLocked = pageProps?.clientSelectionLocked ?? props?.clientSelectionLocked ?? false
+  const defaultClientId = preselectedClientId
+    ? String(preselectedClientId)
+    : clientSelectionLocked && hasClients
+      ? String(clients[0].id)
+      : (hasClients && clients.length === 1 ? String(clients[0].id) : "")
 
-  // Normalize roles/permissions which may be arrays or objects (depending on serialization)
-  const rolesArr = auth?.roles
-    ? (Array.isArray(auth.roles) ? auth.roles : Object.values(auth.roles))
-    : [];
-  const permsArr = auth?.permissions
-    ? (Array.isArray(auth.permissions) ? auth.permissions : Object.values(auth.permissions))
-    : [];
-
-  const rolesLower = rolesArr.map((r) => String(r).toLowerCase());
-  const permsLower = permsArr.map((p) => String(p).toLowerCase());
-  const canAssignManager = rolesLower.includes('admin') || permsLower.includes('assign_brand_manager');
-
-  const { data, setData, post, errors, reset } = useForm({
-    image: "",
+  const form = useForm({
+    image: null,
+    file: null,
     name: "",
-    status: "in_progress",
+    status: "active",
     description: "",
     due_date: "",
     audience: "",
     other_details: "",
-    file_path: "",
-    manager_id: "",
+    client_id: defaultClientId,
   });
+
+  const { data, setData, post, errors, reset, processing } = form;
+
+  useEffect(() => {
+    if (clientSelectionLocked && defaultClientId && data.client_id !== defaultClientId) {
+      setData("client_id", defaultClientId);
+    }
+  }, [clientSelectionLocked, defaultClientId, data.client_id, setData]);
 
   const onSubmit = (e) => {
     e.preventDefault();
 
-    post(route("project.store"));
+    form.transform((formData) => {
+      const payload = { ...formData };
+
+      if (!(payload.image instanceof File)) {
+        delete payload.image;
+      }
+
+      if (!(payload.file instanceof File)) {
+        delete payload.file;
+      }
+
+      delete payload.manager_id;
+
+      return payload;
+    });
+
+    form.post(route("project.store"), {
+      forceFormData: true,
+      onFinish: () => {
+        form.transform((formData) => ({ ...formData }));
+      },
+    });
   };
 
   return (
@@ -55,21 +82,6 @@ export default function Create(props) {
       <Head title="Projects" />
 
       <div className="py-12">
-        {/* DEBUG: show auth and managers for Admin users only (temporary) */}
-        {rolesLower && rolesLower.includes('admin') && (
-          <div className="max-w-7xl mx-auto sm:px-6 lg:px-8 mb-4 p-4 bg-yellow-50 border rounded">
-            <div className="text-sm font-medium mb-2">Debug: Inertia shared props (admin only)</div>
-            <div className="text-xs whitespace-pre-wrap">
-              auth.roles: {JSON.stringify(rolesArr)}
-              \n
-              auth.permissions: {JSON.stringify(permsArr)}
-              \n
-              managers (count): {managers.length}
-              \n
-              managers: {JSON.stringify(managers, null, 2)}
-            </div>
-          </div>
-        )}
         <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
           <div className="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
             <form
@@ -86,7 +98,7 @@ export default function Create(props) {
                   type="file"
                   name="image"
                   className="mt-1 block w-full"
-                  onChange={(e) => setData("image", e.target.files[0])}
+                  onChange={(e) => setData("image", e.target.files[0] ?? null)}
                 />
                 <InputError message={errors.image} className="mt-2" />
               </div>
@@ -105,6 +117,36 @@ export default function Create(props) {
 
                 <InputError message={errors.name} className="mt-2" />
               </div>
+              <div className="mt-4">
+                <InputLabel htmlFor="project_client_id" value="Client" />
+                <SelectInput
+                  id="project_client_id"
+                  name="client_id"
+                  className="mt-1 block w-full"
+                  value={data.client_id}
+                  onChange={(e) => setData("client_id", e.target.value)}
+                  disabled={clientSelectionLocked || !hasClients}
+                >
+                  <option value="">{hasClients ? '-- Select client --' : 'No clients available'}</option>
+                  {clients.map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.name}
+                    </option>
+                  ))}
+                </SelectInput>
+                <InputError message={errors.client_id} className="mt-2" />
+                {!hasClients && (
+                  <p className="mt-2 text-sm text-yellow-600 dark:text-yellow-400">
+                    You need to create a client before creating a brand.
+                  </p>
+                )}
+                {clientSelectionLocked && hasClients && (
+                  <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                    Client selection is locked to your assigned client.
+                  </p>
+                )}
+              </div>
+
               <div className="mt-4">
                 <InputLabel
                   htmlFor="project_description"
@@ -146,26 +188,6 @@ export default function Create(props) {
 
                 </div>
 
-                {/* Manager assignment - Admin only or allowed by permission */}
-                {auth && ((auth.roles && auth.roles.includes('Admin')) || (auth.permissions && auth.permissions.includes('assign_brand_manager'))) && (
-                  <div className="mt-4">
-                    <InputLabel htmlFor="manager_id" value="Assign Manager (optional)" />
-                    <SelectInput
-                      id="manager_id"
-                      name="manager_id"
-                      className="mt-1 block w-full"
-                      value={data.manager_id}
-                      onChange={(e) => setData('manager_id', e.target.value)}
-                    >
-                      <option value="">-- Select manager --</option>
-                      {managers.map((m) => (
-                        <option key={m.id} value={m.id}>{m.name}</option>
-                      ))}
-                    </SelectInput>
-                    <InputError message={errors.manager_id} className="mt-2" />
-                  </div>
-                )}
-
                 <InputError message={errors.description} className="mt-2" />
               </div>
               <div className="mt-4">
@@ -174,9 +196,8 @@ export default function Create(props) {
                   value="Started On"
                 />
 
-                <TextInput
+                <DatePicker
                   id="project_due_date"
-                  type="date"
                   name="due_date"
                   value={data.due_date}
                   className="mt-1 block w-full"
@@ -186,17 +207,19 @@ export default function Create(props) {
                 <InputError message={errors.due_date} className="mt-2" />
               </div>
               <div className="mt-4">
-                {/* <InputLabel htmlFor="project_status" value="Brand Status" /> */}
-
+                <InputLabel
+                  htmlFor="project_status"
+                  value="Brand Status"
+                />
                 <SelectInput
                   name="status"
                   id="project_status"
                   className="mt-1 block w-full"
+                  value={data.status}
                   onChange={(e) => setData("status", e.target.value)}
-                  style={{ display: 'none' }}
                 >
-                  <option value="in_progress">In Progress</option>
-
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
                 </SelectInput>
 
                 {/* file upload */}
@@ -205,14 +228,14 @@ export default function Create(props) {
                     htmlFor="project_file_path"
                     value="Brand Guidlines"
                   />
-                  <TextInput
-                    id="project_file_path"
-                    type="file"
-                    name="file_path"
-                    className="mt-1 block w-full"
-                    onChange={(e) => setData("file", e.target.files[0])}
-                  />
-                  <InputError message={errors.file} className="mt-2" />
+                <TextInput
+                  id="project_file_path"
+                  type="file"
+                  name="file_path"
+                  className="mt-1 block w-full"
+                  onChange={(e) => setData("file", e.target.files[0] ?? null)}
+                />
+                <InputError message={errors.file} className="mt-2" />
                 </div>
 
 
@@ -226,8 +249,8 @@ export default function Create(props) {
                 >
                   Cancel
                 </Link>
-                <button className="bg-emerald-500 py-1 px-3 text-white rounded shadow transition-all hover:bg-emerald-600">
-                  Submit
+                <button className="bg-emerald-500 py-1 px-3 text-white rounded shadow transition-all hover:bg-emerald-600" disabled={processing}>
+                  {processing ? "Saving..." : "Submit"}
                 </button>
               </div>
             </form>

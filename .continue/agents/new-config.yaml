@@ -1,0 +1,18 @@
+# Local Continue.dev Config for DeepSeek Coder
+# Docs: https://docs.continue.dev/reference
+
+name: DeepSeek Config
+version: 1.0.0
+schema: v1
+
+# Define which models can be used
+models:
+  - name: DeepSeek Coder (Local)
+    provider: ollama
+    model: deepseek-coder
+
+# Set default model
+defaultModel: DeepSeek Coder (Local)
+
+# Optional: you can remove or keep this empty if you don't use MCP tools
+mcpServers: []

@@ -2,229 +2,359 @@
 
 namespace App\Services;
 
-use App\Models\Project;
 use App\Models\Brand;
 use App\Models\Task;
 use App\Models\User;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class DashboardMetricsService
 {
     /**
-     * Get overall project statistics
+     * Retrieve the brand ids a manager controls, or null for unrestricted users.
      */
-    public function getProjectStats($user = null)
+    private function managedBrandIds(User $user): ?Collection
     {
-        // Role-aware brand totals
-        $user = $user ?: auth()->user();
+        if (! $user->hasRole('Manager')) {
+            return null;
+        }
 
-        if ($user && method_exists($user, 'hasRole') && $user->hasRole('Admin')) {
-            $totalBrands = Brand::count();
-            $activeBrands = Brand::where('status', 'active')->count();
-        } elseif ($user && method_exists($user, 'hasRole') && $user->hasRole('Manager')) {
-            $totalBrands = Brand::whereHas('managers', function ($q) use ($user) {
-                $q->where('user_id', $user->id);
-            })->count();
-            $activeBrands = Brand::where('status', 'active')
-                ->whereHas('managers', function ($q) use ($user) {
-                    $q->where('user_id', $user->id);
-                })->count();
-        } else {
-            // Team users: brands where they are assigned
-            $totalBrands = Brand::whereHas('teamUsers', function ($q) use ($user) {
-                $q->where('user_id', $user->id);
-            })->count();
-            $activeBrands = Brand::where('status', 'active')
-                ->whereHas('teamUsers', function ($q) use ($user) {
-                    $q->where('user_id', $user->id);
-                })->count();
+        $pivotBrandIds = $user->managedBrands()->pluck('brands.id');
+
+        $clientManagedIds = Brand::query()
+            ->whereHas('client', function ($query) use ($user) {
+                $query->where('manager_user_id', $user->id);
+            })
+            ->pluck('id');
+
+        return $pivotBrandIds
+            ->merge($clientManagedIds)
+            ->unique()
+            ->values();
+    }
+
+    private function isTeamMember(User $user): bool
+    {
+        return !$user->hasRole('Admin') && !$user->hasRole('Manager');
+    }
+
+    private function getProjectStats(User $user, ?Collection $brandIds): array
+    {
+        if ($this->isTeamMember($user)) {
+            $assignedBrandIds = Task::where('assigned_user_id', $user->id)
+                ->whereNotNull('brand_id')
+                ->distinct()
+                ->pluck('brand_id');
+
+            return [
+                'total' => $assignedBrandIds->count(),
+                'active' => $assignedBrandIds->isEmpty()
+                    ? 0
+                    : Brand::whereIn('id', $assignedBrandIds)->where('status', 'active')->count(),
+                'completion_rate' => 0,
+            ];
+        }
+
+        if ($brandIds !== null) {
+            if ($brandIds->isEmpty()) {
+                return [
+                    'total' => 0,
+                    'active' => 0,
+                    'completion_rate' => 0,
+                ];
+            }
+
+            $ids = $brandIds->all();
+            return [
+                'total' => count($ids),
+                'active' => Brand::whereIn('id', $ids)->where('status', 'active')->count(),
+                'completion_rate' => 0,
+            ];
         }
 
         return [
-            'total' => $totalBrands,
-            'active' => $activeBrands,
-            // kept for compatibility (not meaningful for brands)
+            'total' => Brand::count(),
+            'active' => Brand::where('status', 'active')->count(),
             'completion_rate' => 0,
         ];
     }
 
-    /**
-     * Get task statistics by status
-     */
-    public function getTaskStats($user = null)
+    private function getTaskStats(User $user, ?Collection $brandIds): array
     {
-        $user = $user ?: auth()->user();
-
         $query = Task::query();
-        // Scope by role: Managers see only tasks for their brands
-        if ($user && method_exists($user, 'hasRole') && $user->hasRole('Manager')) {
-            $query->whereHas('brand.managers', function ($q) use ($user) {
-                $q->where('user_id', $user->id);
-            });
-        } elseif ($user && method_exists($user, 'hasRole') && !$user->hasRole('Admin')) {
-            // Team users: tasks for brands they are on OR tasks assigned to them
-            $query->where(function ($q) use ($user) {
-                $q->whereHas('brand.teamUsers', function ($q2) use ($user) {
-                    $q2->where('user_id', $user->id);
-                })
-                ->orWhere('assigned_user_id', $user->id);
-            });
+
+        if ($this->isTeamMember($user)) {
+            $query->where('assigned_user_id', $user->id);
+        } elseif ($brandIds !== null) {
+            if ($brandIds->isEmpty()) {
+                return [
+                    'total' => 0,
+                    'by_status' => [],
+                    'completion_rate' => 0,
+                ];
+            }
+            $query->whereIn('brand_id', $brandIds);
         }
 
-        $tasksByStatus = $query->select('status', DB::raw('count(*) as count'))
+        $tasksByStatus = $query->select('status', DB::raw('COUNT(*) as count'))
             ->groupBy('status')
-            ->get()
             ->pluck('count', 'status')
             ->toArray();
 
-        $totalTasks = array_sum($tasksByStatus);
+        $total = array_sum($tasksByStatus);
 
         return [
-            'total' => $totalTasks,
+            'total' => $total,
             'by_status' => $tasksByStatus,
-            'completion_rate' => $totalTasks > 0 && isset($tasksByStatus['completed'])
-                ? round(($tasksByStatus['completed'] / $totalTasks) * 100, 1)
+            'completion_rate' => $total > 0 && isset($tasksByStatus['completed'])
+                ? round(($tasksByStatus['completed'] / $total) * 100, 1)
                 : 0,
         ];
     }
 
-    /**
-     * Get task distribution by user
-     */
-    public function getWorkloadDistribution($limit = 10)
+    private function getWorkloadDistribution(User $user, ?Collection $brandIds, int $limit = 10): Collection
     {
-        // Real-time: remove caching and compute on each request
-        return User::query()
-            ->select(['users.id', 'users.name'])
-            ->selectRaw('(SELECT COUNT(*) FROM tasks WHERE tasks.assigned_user_id = users.id AND tasks.status != ?) as active_tasks', ['completed'])
-            ->whereExists(function ($query) {
-                $query->select(DB::raw(1))
-                    ->from('tasks')
-                    ->whereColumn('tasks.assigned_user_id', 'users.id')
-                    ->where('tasks.status', '!=', 'completed');
-            })
-            ->orderByDesc('active_tasks')
-            ->limit($limit)
-            ->get()
-            ->map(function ($user) {
+        if ($this->isTeamMember($user)) {
+            return collect();
+        }
+
+        $brandKey = 'all';
+        if ($brandIds !== null) {
+            $brandKey = $brandIds->isEmpty() ? 'none' : implode(',', $brandIds->sort()->all());
+        }
+        $cacheKey = "workload_distribution_user_{$user->id}_{$brandKey}_limit_{$limit}";
+
+        return Cache::remember($cacheKey, now()->addMinutes(5), function () use ($brandIds, $limit) {
+            if ($brandIds !== null && $brandIds->isEmpty()) {
+                return collect();
+            }
+
+            $query = Task::query()
+                ->select('assigned_user_id', DB::raw('COUNT(*) as active_tasks'))
+                ->whereNotNull('assigned_user_id')
+                ->where('status', '!=', 'completed');
+
+            if ($brandIds !== null) {
+                $query->whereIn('brand_id', $brandIds);
+            }
+
+            $rows = $query->groupBy('assigned_user_id')
+                ->orderByDesc('active_tasks')
+                ->limit($limit)
+                ->get();
+
+            $users = User::whereIn('id', $rows->pluck('assigned_user_id'))
+                ->get(['id', 'name'])
+                ->keyBy('id');
+
+            return $rows->map(function ($row) use ($users) {
+                $user = $users->get($row->assigned_user_id);
+
                 return [
                     'user' => [
-                        'id' => $user->id,
-                        'name' => $user->name,
+                        'id' => $user?->id,
+                        'name' => $user?->name ?? 'Unknown',
                     ],
-                    'active_tasks' => (int) $user->active_tasks,
+                    'active_tasks' => (int) $row->active_tasks,
                 ];
             });
+        });
     }
 
-    /**
-     * Get upcoming tasks and deadlines
-     */
-    public function getUpcomingDeadlines($user = null)
+    private function getUpcomingDeadlines(User $user, ?Collection $brandIds): Collection
     {
-        // Role-aware upcoming deadlines; no dummy data
-        $user = $user ?: auth()->user();
+        if ($brandIds !== null && $brandIds->isEmpty()) {
+            return collect();
+        }
 
-        $query = Task::query()
+        $query = Task::with(['brand', 'assignedUser'])
             ->where('status', '!=', 'completed')
-            ->whereNotNull('due_date')
-            ->where('due_date', '>=', now())
-            ->with(['project']);
+            ->whereNotNull('due_date');
 
-        if ($user && method_exists($user, 'hasRole') && $user->hasRole('Manager')) {
-            $query->whereHas('brand.managers', function ($q) use ($user) {
-                $q->where('user_id', $user->id);
-            });
-        } elseif ($user && method_exists($user, 'hasRole') && !$user->hasRole('Admin')) {
-            // Team users: deadlines for brands they are on or tasks assigned to them
-            $query->where(function ($q) use ($user) {
-                $q->whereHas('brand.teamUsers', function ($q2) use ($user) {
-                    $q2->where('user_id', $user->id);
-                })
-                ->orWhere('assigned_user_id', $user->id);
-            });
+        if ($brandIds && $brandIds->isNotEmpty()) {
+            $query->whereIn('brand_id', $brandIds);
+        }
+
+        if ($this->isTeamMember($user)) {
+            $query->where('assigned_user_id', $user->id);
         }
 
         return $query->orderBy('due_date')
-            ->limit(5)
+            ->limit(50)
             ->get()
             ->map(function ($task) {
-                $days = Carbon::parse($task->due_date)->diffInDays(now(), false);
+                $dueDate = $task->due_date ? Carbon::parse($task->due_date) : null;
+                $relativeText = null;
+                $isOverdue = false;
+
+                if ($dueDate) {
+                    $diffMinutes = now()->diffInMinutes($dueDate, false);
+                    if ($diffMinutes === 0) {
+                        $relativeText = 'Due now';
+                    } elseif ($diffMinutes > 0) {
+                        $days = intdiv($diffMinutes, 1440);
+                        $hours = intdiv($diffMinutes % 1440, 60);
+                        $minutes = $diffMinutes % 60;
+                        if ($days >= 1) {
+                            $relativeText = $days === 1 ? '1 day left' : "{$days} days left";
+                        } elseif ($hours >= 1) {
+                            $relativeText = $hours === 1 ? '1 hour left' : "{$hours} hours left";
+                        } else {
+                            $relativeText = $minutes === 1 ? '1 minute left' : "{$minutes} minutes left";
+                        }
+                    } else {
+                        $isOverdue = true;
+                        $diffMinutes = abs($diffMinutes);
+                        $days = intdiv($diffMinutes, 1440);
+                        $hours = intdiv($diffMinutes % 1440, 60);
+                        $minutes = $diffMinutes % 60;
+                        if ($days >= 1) {
+                            $relativeText = $days === 1 ? '1 day overdue' : "{$days} days overdue";
+                        } elseif ($hours >= 1) {
+                            $relativeText = $hours === 1 ? '1 hour overdue' : "{$hours} hours overdue";
+                        } else {
+                            $relativeText = $minutes === 1 ? '1 minute overdue' : "{$minutes} minutes overdue";
+                        }
+                    }
+                }
+
                 return [
+                    'task_id' => $task->id,
                     'task_name' => $task->name,
-                    'brand_name' => optional($task->project)->name,
-                    'due_date' => Carbon::parse($task->due_date)->toFormattedDateString(),
-                    'days_remaining' => $days < 0 ? abs($days) . ' days overdue' : $days . ' days left',
-                    'is_overdue' => $days < 0,
+                    'due_date' => $dueDate ? $dueDate->format('M d, Y') : 'No due date',
+                    'raw_due_date' => $dueDate ? $dueDate->toDateString() : null,
+                    'is_overdue' => $isOverdue,
+                    'days_remaining' => $relativeText ?? 'No due date',
+                    'brand_id' => $task->brand?->id,
+                    'brand_name' => $task->brand?->name ?? 'Unassigned brand',
+                    'assigned_to' => $task->assignedUser ? [
+                        'id' => $task->assignedUser->id,
+                        'name' => $task->assignedUser->name,
+                    ] : null,
                 ];
-            })->values();
+            });
     }
 
-    /**
-     * Get recent activity metrics
-     */
-    public function getRecentActivity($user = null)
+    private function getRecentActivity(User $user, ?Collection $brandIds): Collection
     {
-        // Role-aware recent activity; no dummy data
-        $user = $user ?: auth()->user();
-
-        $query = Task::query();
-        if ($user && method_exists($user, 'hasRole') && $user->hasRole('Manager')) {
-            $query->whereHas('brand.managers', function ($q) use ($user) {
-                $q->where('user_id', $user->id);
-            });
-        } elseif ($user && method_exists($user, 'hasRole') && !$user->hasRole('Admin')) {
-            $query->where(function ($q) use ($user) {
-                $q->whereHas('brand.teamUsers', function ($q2) use ($user) {
-                    $q2->where('user_id', $user->id);
-                })
-                ->orWhere('assigned_user_id', $user->id);
-            });
+        if ($brandIds !== null && $brandIds->isEmpty()) {
+            return collect();
         }
 
-        return $query->orderBy('updated_at', 'desc')
-            ->limit(5)
+        $taskQuery = Task::with(['brand:id,name', 'updatedBy:id,name', 'createdBy:id,name'])
+            ->orderByDesc('updated_at')
+            ->limit(10);
+
+        if ($brandIds && $brandIds->isNotEmpty()) {
+            $taskQuery->whereIn('brand_id', $brandIds);
+        }
+
+        if ($this->isTeamMember($user)) {
+            $taskQuery->where('assigned_user_id', $user->id);
+        }
+
+        $taskActivities = $taskQuery
             ->get()
             ->map(function ($task) {
+                $isNew = $task->created_at && $task->created_at->equalTo($task->updated_at);
+                $actor = $task->updatedBy?->name ?? $task->createdBy?->name ?? 'System';
+                $description = $isNew
+                    ? "Task \"{$task->name}\" created by {$actor}"
+                    : "Task \"{$task->name}\" updated by {$actor}";
+
+                if ($task->brand) {
+                    $description .= " for {$task->brand->name}";
+                }
+
+                $timestamp = $task->updated_at ?? $task->created_at ?? now();
+
                 return [
-                    'description' => "Task '{$task->name}' status: {$task->status}",
-                    'time' => Carbon::parse($task->updated_at)->diffForHumans(),
+                    'description' => $description,
+                    'timestamp' => $timestamp,
                 ];
-            })->values();
+            })
+            ->all();
+
+        $brandActivities = [];
+
+        if (!$this->isTeamMember($user)) {
+            $brandActivities = DB::table('brands')
+                ->leftJoin('users as creator', 'creator.id', '=', 'brands.created_by')
+                ->select([
+                    'brands.name',
+                    'brands.created_at',
+                    'brands.updated_at',
+                    DB::raw('COALESCE(creator.name, "System") as creator_name'),
+                ])
+                ->when($brandIds && $brandIds->isNotEmpty(), function ($query) use ($brandIds) {
+                    $query->whereIn('brands.id', $brandIds->all());
+                })
+                ->orderByDesc('brands.updated_at')
+                ->limit(10)
+                ->get()
+                ->map(function ($brand) {
+                    $updatedAt = $brand->updated_at ? Carbon::parse($brand->updated_at) : null;
+                    $createdAt = $brand->created_at ? Carbon::parse($brand->created_at) : null;
+                    $isNew = $createdAt && $updatedAt && $createdAt->equalTo($updatedAt);
+                    $actor = $brand->creator_name ?? 'System';
+                    $description = $isNew
+                        ? "Brand \"{$brand->name}\" created by {$actor}"
+                        : "Brand \"{$brand->name}\" updated";
+
+                    $timestamp = $updatedAt ?? $createdAt ?? now();
+
+                    return [
+                        'description' => $description,
+                        'timestamp' => $timestamp,
+                    ];
+                })
+                ->all();
+        }
+
+        return collect(array_merge($taskActivities, $brandActivities))
+            ->sortByDesc('timestamp')
+            ->map(function ($activity) {
+                $timestamp = $activity['timestamp'] instanceof Carbon
+                    ? $activity['timestamp']
+                    : Carbon::parse($activity['timestamp']);
+
+                return [
+                    'description' => $activity['description'],
+                    'time' => $timestamp->diffForHumans(),
+                ];
+            })
+            ->values();
     }
 
-    /**
-     * Get blocked tasks statistics
-     */
-    public function getBlockedTasksStats()
+    private function getBlockedTasksStats(User $user, ?Collection $brandIds): array
     {
-        // Use eager loading with specific columns to reduce data transfer
-        // Avoid selecting inside whereHas (which causes ambiguous column names in the subquery)
-        $blockedTasks = Task::select('tasks.id', 'tasks.name', 'tasks.project_id', 'tasks.assigned_user_id')
-            ->whereHas('blockedByTasks', function ($query) {
-                $query->where('status', '!=', 'completed');
+        $query = Task::select('tasks.id', 'tasks.name', 'tasks.brand_id', 'tasks.assigned_user_id')
+            ->whereHas('blockedByTasks', function ($sub) {
+                $sub->where('status', '!=', 'completed');
             })
-            ->with([
-                'blockedByTasks:id,name,status',
-                'project:id,name',
-                'assignedUser:id,name'
-            ])
+            ->with(['blockedByTasks:id,name,status', 'brand:id,name', 'assignedUser:id,name'])
             ->orderByDesc('updated_at')
-            ->limit(10) // Limit to most recent blocked tasks
-            ->get();
+            ->limit(10);
 
-        $count = $blockedTasks->count();
+        if ($brandIds && $brandIds->isNotEmpty()) {
+            $query->whereIn('brand_id', $brandIds);
+        }
 
-        // Use collection methods for efficient transformation
+        if ($this->isTeamMember($user)) {
+            $query->where('assigned_user_id', $user->id);
+        }
+
+        $blockedTasks = $query->get();
+
         $tasks = $blockedTasks->map(function ($task) {
             return [
                 'id' => $task->id,
                 'name' => $task->name,
-                'project' => $task->project ? [
-                    'id' => $task->project->id,
-                    'name' => $task->project->name,
+                'brand' => $task->brand ? [
+                    'id' => $task->brand->id,
+                    'name' => $task->brand->name,
                 ] : null,
                 'assigned_to' => $task->assignedUser ? [
                     'id' => $task->assignedUser->id,
@@ -241,57 +371,16 @@ class DashboardMetricsService
         });
 
         return [
-            'count' => $count,
+            'count' => $blockedTasks->count(),
             'tasks' => $tasks,
         ];
     }
 
-    /**
-     * Get all dashboard metrics
-     */
-    public function getAllMetrics()
+    private function getUserStats(User $user): array
     {
-        // Real-time metrics (no caching)
-        $user = auth()->user();
-        return [
-            'projectStats' => $this->getProjectStats($user),
-            'taskStats' => $this->getTaskStats($user),
-            'workloadDistribution' => $this->getWorkloadDistribution(),
-            'upcomingDeadlines' => $this->getUpcomingDeadlines($user),
-            'recentActivity' => $this->getRecentActivity($user),
-            'blockedTasksStats' => $this->getBlockedTasksStats(),
-            'userStats' => $this->getUserStats($user),
-            'activityTimeline' => $this->getActivityTimeline(),
-        ];
-    }
-
-    /**
-     * Get stats for specific user
-     */
-    private function getUserStats($user)
-    {
-        $query = Task::query();
-        if ($user && method_exists($user, 'hasRole') && $user->hasRole('Manager')) {
-            // Managers: tasks for brands they manage
-            $query->whereHas('brand.managers', function ($q) use ($user) {
-                $q->where('user_id', $user->id);
-            });
-        } elseif ($user && method_exists($user, 'hasRole') && !$user->hasRole('Admin')) {
-            // Team users: tasks assigned to them OR in brands they are part of
-            $query->where(function ($q) use ($user) {
-                $q->where('assigned_user_id', $user->id)
-                  ->orWhereHas('brand.teamUsers', function ($q2) use ($user) {
-                      $q2->where('user_id', $user->id);
-                  });
-            });
-        } else {
-            // Admin defaults to assigned to them (often zero), but keep consistent behavior
-            $query->where('assigned_user_id', $user->id);
-        }
-
-        $userTasks = $query->selectRaw('status, COUNT(*) as count')
+        $userTasks = Task::where('assigned_user_id', $user->id)
+            ->selectRaw('status, COUNT(*) as count')
             ->groupBy('status')
-            ->get()
             ->pluck('count', 'status')
             ->toArray();
 
@@ -302,31 +391,59 @@ class DashboardMetricsService
         ];
     }
 
-    /**
-     * Get activity timeline
-     */
-    private function getActivityTimeline()
+    private function getActivityTimeline(User $user, ?Collection $brandIds): Collection
     {
-        return Task::with(['project', 'assignedUser'])
+        $query = Task::with(['brand', 'assignedUser'])
             ->where('updated_at', '>=', now()->subDays(7))
             ->orderBy('updated_at', 'desc')
-            ->limit(10)
-            ->get()
-            ->map(function ($task) {
-                return [
-                    'id' => $task->id,
-                    'name' => $task->name,
-                    'status' => $task->status,
-                    'updated_at' => $task->updated_at,
-                    'project' => $task->project ? [
-                        'id' => $task->project->id,
-                        'name' => $task->project->name,
-                    ] : null,
-                    'assigned_to' => $task->assignedUser ? [
-                        'id' => $task->assignedUser->id,
-                        'name' => $task->assignedUser->name,
-                    ] : null,
-                ];
-            });
+            ->limit(10);
+
+        if ($brandIds && $brandIds->isNotEmpty()) {
+            $query->whereIn('brand_id', $brandIds);
+        }
+
+        if ($this->isTeamMember($user)) {
+            $query->where('assigned_user_id', $user->id);
+        }
+
+        return $query->get()->map(function ($task) {
+            return [
+                'id' => $task->id,
+                'name' => $task->name,
+                'status' => $task->status,
+                'updated_at' => $task->updated_at,
+                'brand' => $task->brand ? [
+                    'id' => $task->brand->id,
+                    'name' => $task->brand->name,
+                ] : null,
+                'assigned_to' => $task->assignedUser ? [
+                    'id' => $task->assignedUser->id,
+                    'name' => $task->assignedUser->name,
+                ] : null,
+            ];
+        });
+    }
+
+    public function getAllMetrics()
+    {
+        $user = auth()->user();
+        $brandIds = $this->managedBrandIds($user);
+        $brandKey = $brandIds && $brandIds->isNotEmpty() ? implode(',', $brandIds->sort()->all()) : 'all';
+
+        $cacheKey = "dashboard_metrics_user_{$user->id}_{$brandKey}_v6";
+
+        return Cache::remember($cacheKey, now()->addMinute(), function () use ($user, $brandIds) {
+            return [
+                'projectStats' => $this->getProjectStats($user, $brandIds),
+                'taskStats' => $this->getTaskStats($user, $brandIds),
+                'workloadDistribution' => $this->getWorkloadDistribution($user, $brandIds),
+                'upcomingDeadlines' => $this->getUpcomingDeadlines($user, $brandIds),
+                'recentActivity' => $this->getRecentActivity($user, $brandIds),
+                'blockedTasksStats' => $this->getBlockedTasksStats($user, $brandIds),
+                'userStats' => $this->getUserStats($user),
+                'activityTimeline' => $this->getActivityTimeline($user, $brandIds),
+            ];
+        });
     }
 }
+

@@ -11,6 +11,8 @@ export default function UpdateProfileInformation({
     className = '',
 }) {
     const user = usePage().props.auth.user;
+    const roles = usePage().props.auth.roles || [];
+    const isManager = roles.includes('Manager') || roles.includes('manager');
 
     const { data, setData, patch, errors, processing, recentlySuccessful } =
         useForm({
@@ -63,6 +65,7 @@ export default function UpdateProfileInformation({
                         value={data.email}
                         onChange={(e) => setData('email', e.target.value)}
                         required
+                        disabled={isManager}
                         autoComplete="username"
                     />
 

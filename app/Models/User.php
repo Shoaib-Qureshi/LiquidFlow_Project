@@ -8,11 +8,20 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Spatie\Permission\Traits\HasRoles;
 use App\Models\Brand;
 
 
-class User extends Authenticatable implements MustVerifyEmail
+/**
+ * @method bool hasRole(string|array $roles)
+ * @method \Illuminate\Support\Collection getRoleNames()
+ * @method void assignRole(string $role)
+ * @method BelongsToMany managedBrands()
+ * @method BelongsToMany assignedBrands()
+ */
+class User extends Authenticatable implements MustVerifyEmail, \App\Contracts\HasRoleContract
 {
     use HasFactory, Notifiable, HasRoles;
 
@@ -54,7 +63,7 @@ class User extends Authenticatable implements MustVerifyEmail
     /**
      * Get brands that this user manages
      */
-    public function managedBrands()
+    public function managedBrands(): BelongsToMany
     {
         return $this->belongsToMany(Brand::class, 'brand_managers');
     }
@@ -62,7 +71,7 @@ class User extends Authenticatable implements MustVerifyEmail
     /**
      * Get brands that this user is part of as a team member
      */
-    public function assignedBrands()
+    public function assignedBrands(): BelongsToMany
     {
         return $this->belongsToMany(Brand::class, 'brand_users');
     }
@@ -86,5 +95,10 @@ class User extends Authenticatable implements MustVerifyEmail
     public function comments()
     {
         return $this->hasMany(Comment::class);
+    }
+
+    public function client(): HasOne
+    {
+        return $this->hasOne(Client::class, 'manager_user_id');
     }
 }

@@ -1,0 +1,66 @@
+{
+  "tech_stack": [
+    "PHP 8.2",
+    "Laravel 11",
+    "Inertia.js + React",
+    "Vite",
+    "TailwindCSS",
+    "Spatie Laravel Permission",
+    "MySQL / SQLite (Eloquent)",
+    "Pest (tests)"
+  ],
+  "features": [
+    {
+      "name": "Authentication",
+      "description": "Standard Laravel authentication scaffolding (Breeze) with Inertia + React UI; user registration, login, password reset, profile update.",
+      "files": [
+        "routes/auth.php",
+        "app/Http/Controllers/Auth/*",
+        "resources/js/Pages/Auth/*"
+      ],
+      "api_doc": {}
+    },
+    {
+      "name": "Brand Management",
+      "description": "CRUD for Brands. Brands have managers and team users via pivot tables (brand_managers, brand_users). Managers can create brands and assign managers. Stores extra metadata like audience and started_on.",
+      "files": [
+        "app/Http/Controllers/BrandController.php",
+        "app/Models/Brand.php",
+        "database/migrations/*brands*.php",
+        "resources/js/Pages/Brand/*"
+      ],
+      "api_doc": {}
+    },
+    {
+      "name": "User Management / Team Members",
+      "description": "Admin and Manager flows to create users. Managers can create team members and assign them to one or more brands via brand_users pivot. Role assignment via Spatie package.",
+      "files": [
+        "app/Http/Controllers/UserController.php",
+        "app/Http/Requests/StoreUserRequest.php",
+        "app/Http/Requests/UpdateUserRequest.php",
+        "app/Models/User.php",
+        "resources/js/Pages/User/*"
+      ],
+      "api_doc": {}
+    },
+    {
+      "name": "Tasks",
+      "description": "Task CRUD with assignment to brands and users. Task visibility is filtered so TeamUser sees tasks for their assigned brands and assigned tasks. Task comments and dependency relations exist.",
+      "files": [
+        "app/Http/Controllers/TaskController.php",
+        "app/Models/Task.php",
+        "resources/js/Pages/Task/*"
+      ],
+      "api_doc": {}
+    },
+    {
+      "name": "Dashboard Metrics",
+      "description": "Service to aggregate recent activity across tasks and brands shown on the dashboard.",
+      "files": [
+        "app/Services/DashboardMetricsService.php",
+        "resources/js/Pages/Dashboard/*"
+      ],
+      "api_doc": {}
+    }
+  ]
+}

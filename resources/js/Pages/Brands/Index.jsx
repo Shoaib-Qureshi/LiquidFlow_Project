@@ -4,34 +4,42 @@ import { Head, Link, usePage, router } from '@inertiajs/react'
 
 function BrandCard({ brand }) {
     return (
-        <div className="card-soft overflow-hidden rounded-lg shadow-sm bg-white flex flex-col">
-            <div className="w-full h-40 bg-gradient-to-r from-indigo-500 to-pink-500 flex items-center justify-center">
-                <h3 className="text-white text-xl font-bold">{brand.name.charAt(0)}</h3>
-            </div>
-
-            <div className="p-4 flex-1 flex flex-col justify-between">
-                <div>
-                    <h3 className="text-lg font-semibold">{brand.name}</h3>
-                    <p className="text-sm text-gray-500 mt-2">{brand.description ?? 'No description'}</p>
-                    <div className="mt-2">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${brand.status === 'active'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
-                            }`}>
-                            {brand.status}
-                        </span>
-                    </div>
+        <div className="card-soft overflow-hidden rounded-lg shadow-sm flex flex-col">
+            <Link href={route('brands.show', brand.id)}>
+                <div className="w-full h-40 bg-gradient-to-r from-indigo-500 to-pink-500 flex items-center justify-center">
+                    <h3 className="text-white text-xl font-bold">{brand.name.charAt(0)}</h3>
                 </div>
 
-                <div className="mt-4 flex items-center justify-between">
-                    <div className="text-sm text-gray-500">
-                        <div>Tasks: {brand.taskStats.total}</div>
-                        <div>Active: {brand.taskStats.active}</div>
-                        <div>Completed: {brand.taskStats.completed}</div>
+                <div className="p-4 flex-1 flex flex-col justify-between">
+                    <div>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{brand.name}</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">{brand.description ?? 'No description'}</p>
+                        {brand.client && (
+                            <div className="mt-2 text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                Client: <span className="text-gray-700 dark:text-gray-200 font-medium">{brand.client.name}</span>
+                            </div>
+                        )}
+                        <div className="mt-2">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${brand.status === 'active'
+                                ? 'bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-200'
+                                : 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200'
+                                }`}>
+                                {brand.status}
+                            </span>
+                        </div>
                     </div>
-                    <Link href={route('brands.show', brand.id)} className="text-blue-600 hover:underline">View</Link>
+
+                    <div className="mt-4 flex items-center justify-between">
+
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                            <div>Tasks: {brand.taskStats.total}</div>
+                            <div>Active: {brand.taskStats.active}</div>
+                            <div>Completed: {brand.taskStats.completed}</div>
+                        </div>
+                        <Link href={route('brands.show', brand.id)} className="text-blue-600 dark:text-blue-400 hover:underline dark:hover:text-blue-300">View</Link>
+                    </div>
                 </div>
-            </div>
+            </Link>
         </div>
     )
 }
@@ -42,20 +50,18 @@ export default function Index({ brands = { data: [] }, can = {} }) {
     const auth = props?.auth ?? {}
     const permissions = auth.permissions ?? []
     const roles = auth.roles ?? []
-    const managedBrandId = auth.managed_brand_id ?? null
     const [selectedBrandId, setSelectedBrandId] = useState('')
-    
+
     // Decide if the current user should be allowed to create a brand in the UI
-    // Admin can always create, Manager can create only if they don't have a brand yet
-    const canCreate = roles.includes('Admin') || 
-                     (roles.includes('Manager') && !managedBrandId) ||
-                     permissions.includes('create_brand')
-    
+    const canCreate = roles.includes('Admin') ||
+        roles.includes('Manager') ||
+        permissions.includes('create_brand')
+
     // Filter brands based on selected brand
-    const filteredItems = selectedBrandId 
+    const filteredItems = selectedBrandId
         ? items.filter(brand => brand.id.toString() === selectedBrandId)
         : items
-    
+
     const handleBrandFilter = (brandId) => {
         setSelectedBrandId(brandId)
     }
@@ -66,13 +72,13 @@ export default function Index({ brands = { data: [] }, can = {} }) {
 
             {/* Admin Brand Filter */}
             {roles.includes('Admin') && (
-                <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                    <div className="flex items-center gap-4">
-                        <label className="text-sm font-medium text-gray-700">Filter by Brand:</label>
-                        <select 
+                <div className="mb-6 bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-gray-200 dark:border-slate-800 p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-200">Filter by Brand:</label>
+                        <select
                             value={selectedBrandId}
                             onChange={(e) => handleBrandFilter(e.target.value)}
-                            className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            className="rounded-md border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-gray-100 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                         >
                             <option value="">All Brands</option>
                             {items.map((brand) => (
@@ -87,7 +93,7 @@ export default function Index({ brands = { data: [] }, can = {} }) {
 
             <div className="mb-6 flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                    <div className="text-sm text-gray-600">Showing {filteredItems.length} brands</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-300">Showing {filteredItems.length} brands</div>
                 </div>
 
                 <div>
@@ -99,8 +105,8 @@ export default function Index({ brands = { data: [] }, can = {} }) {
 
             {filteredItems.length === 0 ? (
                 <div className="text-center py-12">
-                    <div className="text-gray-500 text-lg">No brands found</div>
-                    <div className="text-gray-400 text-sm mt-2">
+                    <div className="text-gray-500 dark:text-gray-400 text-lg">No brands found</div>
+                    <div className="text-gray-400 dark:text-gray-500 text-sm mt-2">
                         {selectedBrandId ? 'No brands match the selected filter.' : (can.create ? 'Get started by creating your first brand.' : 'No brands available.')}
                     </div>
                 </div>
@@ -120,7 +126,7 @@ export default function Index({ brands = { data: [] }, can = {} }) {
                         if (typeof rawLinks === 'string') {
                             const stripped = rawLinks.replace(/https?:\/\/[^\s"'<]+/g, '');
                             return (
-                                <div className="prose text-sm text-gray-700" dangerouslySetInnerHTML={{ __html: stripped }} />
+                                <div className="prose text-sm text-gray-700 dark:text-gray-300" dangerouslySetInnerHTML={{ __html: stripped }} />
                             );
                         }
 
@@ -134,7 +140,7 @@ export default function Index({ brands = { data: [] }, can = {} }) {
                                     if (typeof link === 'string') {
                                         const stripped = String(link).replace(/https?:\/\/[^\s"'<]+/g, '');
                                         return (
-                                            <span key={idx} className="px-3 py-1 text-gray-700" dangerouslySetInnerHTML={{ __html: stripped }} />
+                                            <span key={idx} className="px-3 py-1 text-gray-700 dark:text-gray-300" dangerouslySetInnerHTML={{ __html: stripped }} />
                                         );
                                     }
 
@@ -148,7 +154,7 @@ export default function Index({ brands = { data: [] }, can = {} }) {
                                         return (
                                             <span
                                                 key={idx}
-                                                className={`px-3 py-1 rounded ${isActive ? 'bg-indigo-600 text-white' : 'text-gray-500'}`}
+                                                className={`px-3 py-1 rounded ${isActive ? 'bg-indigo-600 text-white' : 'text-gray-500 dark:text-gray-400'}`}
                                                 dangerouslySetInnerHTML={{ __html: safeLabel }}
                                             />
                                         );
@@ -158,7 +164,7 @@ export default function Index({ brands = { data: [] }, can = {} }) {
                                         <Link
                                             key={idx}
                                             href={url}
-                                            className={`px-3 py-1 rounded ${isActive ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-100'}`}
+                                            className={`px-3 py-1 rounded ${isActive ? 'bg-indigo-600 text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800'}`}
                                             dangerouslySetInnerHTML={{ __html: String(label).replace(/https?:\/\/[^\s"'<]+/g, '') }}
                                         />
                                     );

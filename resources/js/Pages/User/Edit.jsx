@@ -1,18 +1,28 @@
 import InputError from "@/Components/InputError";
 import InputLabel from "@/Components/InputLabel";
+import MultiSelectDropdown from '@/Components/MultiSelectDropdown';
 import SelectInput from "@/Components/SelectInput";
 import TextAreaInput from "@/Components/TextAreaInput";
 import TextInput from "@/Components/TextInput";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { Head, Link, useForm } from "@inertiajs/react";
 
-export default function Create({ auth, user }) {
+export default function Create({ auth, user, brands = [], assigned_brand_ids = [] }) {
+  const isManager = () => {
+    try {
+      return auth.user && auth.user.roles && auth.user.roles.find((r) => r.name === 'Manager');
+    } catch (e) {
+      return false;
+    }
+  };
+
   const { data, setData, post, errors, reset } = useForm({
     name: user.name || "",
     email: user.email || "",
     password: "",
     password_confirmation: "",
     _method: "PUT",
+    brand_ids: assigned_brand_ids || [],
   });
 
   const onSubmit = (e) => {
@@ -108,6 +118,16 @@ export default function Create({ auth, user }) {
                   className="mt-2"
                 />
               </div>
+
+              {isManager() && (
+                <div className="mt-4">
+                  <InputLabel value="Assign Brands" />
+                  <div className="mt-2">
+                    <MultiSelectDropdown options={brands} selected={data.brand_ids} onChange={(next) => setData('brand_ids', next)} placeholder="Select brands..." />
+                  </div>
+                </div>
+              )}
+              {/* brand_ids is sent from Inertia form state (useForm) as an array; no hidden input needed */}
               <div className="mt-4 text-right">
                 <Link
                   href={route("user.index")}
