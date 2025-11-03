@@ -103,7 +103,7 @@ php artisan queue:work --queue=default
 ```
 
 ### 6. WordPress Configuration
-1. Install the repo under `C:\Users\shoai\Local Sites\liquidflowwp\app\public` (LocalWP in this project).  
+1. Install the repo under `\liquidflowwp\app\public` (LocalWP in this project).  
 2. Ensure `wp-content/mu-plugins/liquidflow-sync.php` is present and activated.  
 3. Add to `wp-config.php`:
    ```php
